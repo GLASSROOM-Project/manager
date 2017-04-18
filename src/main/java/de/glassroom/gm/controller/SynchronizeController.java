@@ -339,25 +339,20 @@ public class SynchronizeController implements Initializable, SceneController {
     }
 
     private void copyGuideToClient(GuideModel guide) {
+        File dirToCopy = repoPersistenceHandler.getGuideDir(guide.getId());
+        boolean guideExistsOnClient = clientGuideManager.getBean().getGuide(guide.getId()) != null;
+        if (guideExistsOnClient) {
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Anleitung überschreiben");
+            alert.setHeaderText("Wollen sie die Anleitung \"" + guide.titleProperty().get() + "\" auf dem Client wirklich überschreiben?");
+            Optional<ButtonType> result = alert.showAndWait();
+
+            if (result.get() != ButtonType.OK) {
+                return;
+            }
+        }
         new Thread() {
             public void run() {
-                File dirToCopy = repoPersistenceHandler.getGuideDir(guide.getId());
-                boolean guideExistsOnClient = clientGuideManager.getBean().getGuide(guide.getId()) != null;
-//                Platform.runLater(new Runnable() {
-//                    @Override
-//                    public void run() {
-                        if (guideExistsOnClient) {
-                            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-                            alert.setTitle("Anleitung überschreiben");
-                            alert.setHeaderText("Wollen sie die Anleitung \"" + guide.titleProperty().get() + "\" auf dem Client wirklich überschreiben?");
-                            Optional<ButtonType> result = alert.showAndWait();
-
-                            if (result.get() != ButtonType.OK) {
-                                return;
-                            }
-                        }
-//                    }
-//                });
                 try {
                     Platform.runLater(new Runnable() {
                         @Override
@@ -401,26 +396,33 @@ public class SynchronizeController implements Initializable, SceneController {
     }
 
     private void copyGuideToRepository(GuideModel guide) {
+        File dirToCopy = clientPersistenceHandler.getGuideDir(guide.getId());
+        boolean guideExistsInRepo = session.getGuideManager().getBean().getGuide(guide.getId()) != null;
+        if (guideExistsInRepo) {
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Anleitung überschreiben");
+            alert.setHeaderText("Wollen sie die Anleitung \"" + guide.titleProperty().get() + "\" im Repository wirklich überschreiben?");
+            Optional<ButtonType> result = alert.showAndWait();
+
+            if (result.get() != ButtonType.OK) {
+                return;
+            }
+        }
         new Thread() {
             public void run() {
-                File dirToCopy = clientPersistenceHandler.getGuideDir(guide.getId());
-                boolean guideExistsInRepo = session.getGuideManager().getBean().getGuide(guide.getId()) != null;
-                if (guideExistsInRepo) {
-                    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-                    alert.setTitle("Anleitung überschreiben");
-                    alert.setHeaderText("Wollen sie die Anleitung \"" + guide.titleProperty().get() + "\" im Repository wirklich überschreiben?");
-                    Optional<ButtonType> result = alert.showAndWait();
-
-                    if (result.get() != ButtonType.OK) {
-                        return;
-                    }
-                }
                 try {
-                    GuideManager newManager = repoPersistenceHandler.importGuide(dirToCopy);
                     Platform.runLater(new Runnable() {
                         @Override
                         public void run() {
-                            session.setGuideManager(new GuideManagerModel(newManager, MainApp.LANG));
+                            setLoading(true);
+                        }
+                    });
+                    GuideManager newManager = repoPersistenceHandler.importGuide(dirToCopy);
+                    session.setGuideManager(new GuideManagerModel(newManager, MainApp.LANG));
+                    Platform.runLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            setLoading(false);
                             updateLists(newManager, clientGuideManager.getBean());
                         }
                     });
@@ -430,6 +432,13 @@ public class SynchronizeController implements Initializable, SceneController {
                     LOGGER.log(Level.SEVERE, "Failed to import guide.", ex);
                     showAlert("Das Kopieren der Anleitung ist fehlgeschlagen!");
                     updateLists(session.getGuideManager().getBean(), clientGuideManager.getBean());
+                } finally {
+                    Platform.runLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            setLoading(false);
+                        }
+                    });
                 }
             }
         }.start();

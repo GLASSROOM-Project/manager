@@ -1,3 +1,6 @@
+1.2.1
+- [FIX] Fixed synchronization bug.
+
 1.2
 - [NEW] Added combination of steps to chapters.
 - [FIX] Several bugfixes.
